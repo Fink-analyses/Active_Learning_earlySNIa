@@ -3,31 +3,6 @@ import numpy as np
 import pandas as pd
 from astropy.time import Time, TimeDelta
 
-observing_periods = {
-    1: [Time("2023-09-25", format="iso").jd, Time("2023-10-23", format="iso").jd],
-    2: [Time("2024-02-25", format="iso").jd, Time("2024-02-29", format="iso").jd],
-    3: [Time("2024-04-04", format="iso").jd, Time("2024-06-02", format="iso").jd],
-    4: [Time("2024-06-24", format="iso").jd, Time("2024-08-15", format="iso").jd],
-}
-
-
-def add_days_and_format(x, days):
-    """Function to convert Time object to desired format
-
-    Args:
-        x (str): Date in tring format
-        days (int): number of days to add
-
-    Returns:
-        str: Date plus delta
-    """
-    # Convert Time object to datetime
-    time_obj = Time(x, format="iso") + TimeDelta(days, format="jd")
-    dt = time_obj.datetime
-    # dt = time_obj.datetime
-    # Format datetime to custom format
-    return f"{dt.year}{dt.month:02d}{dt.day:02d}"
-
 
 def extract_ztf_names(row):
     """Function to extract names starting with 'ZTF'
@@ -50,14 +25,14 @@ def extract_ztf_names(row):
         return ""
 
 
-def load_TNS_Fink(fname, ndaysplus=9):
+def load_TNS_reformat(fname):
     """Read Fink TNS file and format information
 
     Args:
         fname (str): TNS filename (Fink .parquet)
 
     Returns:
-        pd.DataFrame: DataFrame with TNS classified ZTF detected events
+        pd.DataFrame: DataFrame with reformatted type for AL loop
     """
     # read TNS labels
     df_tmp = pd.read_parquet(fname)
@@ -68,48 +43,67 @@ def load_TNS_Fink(fname, ndaysplus=9):
     df.loc[:, "ztf_names"] = (
         df.loc[:, "internal_names"].apply(extract_ztf_names).to_numpy()
     )
-
     # reformatting time columns
-    df["discoveryjd"] = [Time(d, format="iso").jd for d in df["discoverydate"]]
-    df[f"discoveryjd+{ndaysplus}"] = df["discoveryjd"].apply(
-        lambda x: int(x + ndaysplus)
-    )  # time to get ~3 measurements in each band
-    df[f"discoveryjd+{ndaysplus}_strfmt"] = df.loc[:, "discoverydate"].apply(
-        lambda x: add_days_and_format(x, ndaysplus)
-    )
-
-    # # constraining observing periods
-    mask1 = (df[f"discoveryjd+{ndaysplus}"] > observing_periods[1][0]) & (
-        df[f"discoveryjd+{ndaysplus}"] < observing_periods[1][1]
-    )
-    mask2 = (df[f"discoveryjd+{ndaysplus}"] > observing_periods[2][0]) & (
-        df[f"discoveryjd+{ndaysplus}"] < observing_periods[2][1]
-    )
-    mask3 = (df[f"discoveryjd+{ndaysplus}"] > observing_periods[3][0]) & (
-        df[f"discoveryjd+{ndaysplus}"] < observing_periods[3][1]
-    )
-    mask4 = (df[f"discoveryjd+{ndaysplus}"] > observing_periods[4][0]) & (
-        df[f"discoveryjd+{ndaysplus}"] < observing_periods[4][1]
-    )
-    df_indaterange = df[mask1 | mask2 | mask3 | mask4]
+    df["discoveryjd"] = [int(Time(d, format="iso").jd) for d in df["discoverydate"]]
 
     # reformat
-    df_indaterange.loc[:, "type"] = df_indaterange.loc[:, "type"].str.strip("(TNS) SN ")
-    df_indaterange["type AL"] = df_indaterange.loc[:, "type"].apply(
-        lambda x: "Ia" if "Ia" in x else "other"
-    )
+    df.loc[:, "type"] = df.loc[:, "type"].str.strip("(TNS) SN ")
+    df["type AL"] = df.loc[:, "type"].apply(lambda x: "Ia" if "Ia" in x else "other")
 
-    df_out = df_indaterange[
+    df_out = df[
         [
             "ztf_names",
             "type AL",
-            f"discoveryjd+{ndaysplus}",
-            f"discoveryjd+{ndaysplus}_strfmt",
+            "discoveryjd",
             "type",
             "reporting_group",
         ]
     ].copy()
     # sort
-    df_out = df_out.sort_values(by=f"discoveryjd+{ndaysplus}")
+    df_out = df_out.sort_values(by=f"discoveryjd")
 
     return df_out
+
+
+def apply_timerange_fink_fup(df, ndaysplus=9):
+    """Apply AL follow-up time range given a time after discovery
+
+    Args:
+        df ([pd.DatatFrame]): reformatted TNS dataframe
+        ndaysplus (int, optional): How many days after discovery this analysis uses. Defaults to 9.
+
+    Returns:
+        [pd.DatatFrame]: TNS dataframe with time range of AL SSO follow-up
+    """
+
+    observing_periods = {
+        1: [Time("2023-09-25", format="iso").jd, Time("2023-10-23", format="iso").jd],
+        2: [Time("2024-02-25", format="iso").jd, Time("2024-02-29", format="iso").jd],
+        3: [Time("2024-04-04", format="iso").jd, Time("2024-06-02", format="iso").jd],
+        4: [Time("2024-06-24", format="iso").jd, Time("2024-08-15", format="iso").jd],
+    }
+
+    df["fup requested"] = df["discoveryjd"].apply(lambda x: int(x + ndaysplus))
+    df["fup requested (str)"] = df.loc[:, "fup requested"].apply(
+        lambda x: Time(x, format="jd").strftime("%Y%m%d")
+    )
+
+    # 1 day more for label acquisition
+    df["label acquired"] = df["discoveryjd"].apply(lambda x: int(x + ndaysplus + 1))
+
+    # constraining observing periods
+    mask1 = (df["label acquired"] > observing_periods[1][0]) & (
+        df["label acquired"] < observing_periods[1][1]
+    )
+    mask2 = (df["label acquired"] > observing_periods[2][0]) & (
+        df["label acquired"] < observing_periods[2][1]
+    )
+    mask3 = (df["label acquired"] > observing_periods[3][0]) & (
+        df["label acquired"] < observing_periods[3][1]
+    )
+    mask4 = (df["label acquired"] > observing_periods[4][0]) & (
+        df["label acquired"] < observing_periods[4][1]
+    )
+    df_indaterange = df[mask1 | mask2 | mask3 | mask4]
+
+    return df_indaterange

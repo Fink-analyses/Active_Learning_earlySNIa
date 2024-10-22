@@ -523,7 +523,7 @@ def AL_loop(
     return metrics
 
 
-def convert_DF_dic_labels(df, key_spectra="discoveryjd+9"):
+def convert_DF_dic_labels(df):
     """TNS labels DataFrame to dictionary
 
     Args:
@@ -534,35 +534,9 @@ def convert_DF_dic_labels(df, key_spectra="discoveryjd+9"):
     """
     # convert to new_labels format
     dic_labels = {}
-    for dat in df[key_spectra].unique()[:60]:
-        sel = df[df[key_spectra] == dat]
-
-        # add one day for tag acquisition
-        sel.loc[:, key_spectra] += 1
-        tmp_arr = sel[["ztf_names", "type AL", key_spectra]].to_numpy()
-
-        date_in_str_fmt = sel[f"{key_spectra}_strfmt"].values[0]
-        dic_labels[date_in_str_fmt] = tmp_arr
-
-    return dic_labels
-
-
-def convert_DF_dic_labels_old(df):
-    """TNS labels DataFrame to dictionary
-
-    Args:
-        df (pd.DataFrame): TNS classifications (Fink format)
-
-    Returns:
-        dictionary : formated labels in dictionary for AL loop
-    """
-    # convert to new_labels format
-    dic_labels = {}
-    for dat in df["discoveryjd+9"].unique()[:60]:
-        sel = df[df["discoveryjd+9"] == dat]
-        tmp_arr = sel[["ztf_names", "type AL", "discoveryjd+9"]].to_numpy()
-
-        date_in_str_fmt = sel["discoveryjd+9_strfmt"].values[0]
-        dic_labels[date_in_str_fmt] = tmp_arr
+    for dat in df["fup requested (str)"].unique():
+        sel = df[df["fup requested (str)"] == dat]
+        tmp_arr = sel[["ztf_names", "type AL", "label acquired"]].to_numpy()
+        dic_labels[dat] = tmp_arr
 
     return dic_labels
