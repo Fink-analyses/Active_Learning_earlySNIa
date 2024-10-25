@@ -154,12 +154,13 @@ def read_previous_state(d, date, new_labels, dir_output, strategy, verbose=False
     return train_for_loop, clf_before, train_for_loop_probas
 
 
-def get_alert_data(new_labels, date, verbose=False):
+def get_alert_data(new_labels, date, verbose=False, withmaglimit=False):
     """Get Fink alert data
 
     Args:
         new_labels (dic): dictionary with AL loop labels
         date (str): date currently in the loop
+        withmaglimit (bool, optional): Use last limiting magnitude to extract features. Defaults to False.
         verbose (bool, optional): If print information. Defaults to False.
 
     Returns:
@@ -184,9 +185,10 @@ def get_alert_data(new_labels, date, verbose=False):
         try:
             # Format output in a DataFrame
             pdf = pd.read_json(io.BytesIO(r.content))
-            pdf = pdf[
-                pdf["d:tag"] != "upperlim"
-            ]  # using valida and badquality detections
+            if not withmaglimit:
+                pdf = pdf[
+                    pdf["d:tag"] != "upperlim"
+                ]  # using valida and badquality detections
         except Exception:
             # empty DataFrame
             print(f"Empty data for {name} or error in request {r}")
@@ -211,6 +213,7 @@ def AL_loop(
     output_path="../dump/",
     proba_cut=True,
     plot_lcs=False,
+    withmaglimit=False,
     verbose=False,
 ):
     """Active Learning loop
@@ -222,6 +225,7 @@ def AL_loop(
         dir_suffix (str, optional): output directory suffix. Defaults to "".
         proba_cut (bool, optional): select only alerts within a range of probabilities. Defaults to False.
         plot_lcs (bool, optional): Plot light-curves used in the loop. Defaults to False.
+        withmaglimit (bool, optional): If last limiting magnitude used for feature selection.
         verbose (bool, optional): Verbose. Defaults to False.
 
     Returns:
@@ -256,7 +260,9 @@ def AL_loop(
         )
 
         # Get alert data until follow-up date
-        alerts_list = get_alert_data(new_labels, date, verbose=False)
+        alerts_list = get_alert_data(
+            new_labels, date, withmaglimit=withmaglimit, verbose=False
+        )
 
         # Check data from Fink
         if len(alerts_list) > 0:
@@ -282,6 +288,24 @@ def AL_loop(
                     candid = sel_obj_wdaterange["i:candid"].values[
                         np.argsort(sel_obj_wdaterange["i:jd"].values)[-1]
                     ]
+                    if withmaglimit:
+                        # Step 1: Filter rows where 'd:tag' is not 'upperlim' (valid and bad qual)
+                        mags_rows = sel_obj_wdaterange[
+                            sel_obj_wdaterange["d:tag"] != "upperlim"
+                        ]
+                        max_mag = mags_rows["i:magpsf"].max()
+
+                        # Step 2: For 'upperlim', keep only the first occurrence per 'i:fid' if fainter than first detection
+                        upperlim_rows = sel_obj_wdaterange[
+                            (sel_obj_wdaterange["d:tag"] == "upperlim")
+                            & (sel_obj_wdaterange["i:diffmaglim"] > max_mag)
+                        ].drop_duplicates(subset="i:fid", keep="first")
+                        upperlim_rows["i:magpsf"] = upperlim_rows["i:diffmaglim"].copy()
+                        upperlim_rows["i:sigmapsf"] = (
+                            0.2  # large error for upper limits
+                        )
+                        # Step 3: Combine the valid rows with the first occurrences of 'upperlim'
+                        sel_obj_wdaterange = pd.concat([mags_rows, upperlim_rows])
                     lc = pd.DataFrame(
                         [
                             [
