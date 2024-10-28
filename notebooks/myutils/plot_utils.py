@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 from actsnfink import *
+import matplotlib as mpl
 import matplotlib.pylab as plt
 
 
@@ -11,6 +12,12 @@ colordic = {1: "C0", 2: "C1", "g": "C0", "r": "C1"}
 
 # Labels of ZTF filters
 filtdic = {1: "g", 2: "r"}
+
+
+mpl.rcParams["font.size"] = 16
+mpl.rcParams["legend.fontsize"] = "medium"
+mpl.rcParams["figure.titlesize"] = "large"
+mpl.rcParams["lines.linewidth"] = 3
 
 
 def plot_lc_mag(lc, proba, dir_suffix=""):
@@ -132,12 +139,12 @@ def plot_metrics_listdf(
     else:
         new_list_df = list_df
 
-    plt.figure(figsize=(16, 10))
+    plt.figure(figsize=(16, 10), tight_layout=True)
 
     for i, df in enumerate(new_list_df):
 
         color_to_use = fink_colors_list[i]
-        xlabel = "date" if varx == "date_universal" else varx
+        xlabel = "normalised date" if varx == "date_universal" else varx
 
         plt.subplot(2, 2, 1)
         plt.scatter(
