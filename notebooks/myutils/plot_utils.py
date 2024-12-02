@@ -129,7 +129,7 @@ def plot_metrics_listdf(
         all_dates = np.concat([df["date"].values for df in list_df])
         all_dates.sort()
         to_merge = pd.DataFrame(
-            {"date": all_dates, "date_universal": np.arange(0, len(all_dates))}
+            {"date": all_dates, "date_universal": np.arange(1, len(all_dates) + 1)}
         )
 
         new_list_df = []

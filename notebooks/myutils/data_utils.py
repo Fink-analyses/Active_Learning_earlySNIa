@@ -25,7 +25,7 @@ def extract_ztf_names(row):
         return ""
 
 
-def load_TNS_reformat(fname):
+def load_TNS_reformat(fname, cols_to_add=None):
     """Read Fink TNS file and format information
 
     Args:
@@ -50,15 +50,16 @@ def load_TNS_reformat(fname):
     df.loc[:, "type"] = df.loc[:, "type"].str.strip("(TNS) SN ")
     df["type AL"] = df.loc[:, "type"].apply(lambda x: "Ia" if "Ia" in x else "other")
 
-    df_out = df[
-        [
-            "ztf_names",
-            "type AL",
-            "discoveryjd",
-            "type",
-            "reporting_group",
-        ]
-    ].copy()
+    cols_out = [
+        "ztf_names",
+        "type AL",
+        "discoveryjd",
+        "type",
+        "reporting_group",
+    ]
+    if cols_to_add:
+        cols_out += cols_to_add
+    df_out = df[cols_out].copy()
     # sort
     df_out = df_out.sort_values(by=f"discoveryjd")
 
