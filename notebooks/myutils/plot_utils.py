@@ -4,7 +4,7 @@ import pandas as pd
 from actsnfink import *
 import matplotlib as mpl
 import matplotlib.pylab as plt
-
+from myutils import data_utils as du
 
 fink_colors_list = ["#15284F", "#F5622E", "#D5D5D3", "#3C8DFF"]
 # Colors to plot
@@ -110,8 +110,44 @@ def plot_lc_flux_wfit(lc, proba, alerts_features, dir_suffix=""):
     plt.close()
 
 
+def get_vertical_lines(list_df, varx):
+    """Generate vertical lines for observing seasons
+
+    Args:
+        list_df (list): list of pandas dataframes
+        varx (str): variable x
+
+    Returns:
+        list: position of vertical lines
+    """
+    for df in list_df:
+        list_vlines = []
+        for i in du.observing_periods_str.keys():
+            tmp = df[
+                df["date"] == int(du.observing_periods_str[i][0].replace("-", ""))
+            ][varx].values
+            if len(tmp) > 0:
+                list_vlines.append(tmp[0])
+            else:
+                # search for closest date
+                for delta in [-1, 1, -2, 2, -3, 3, -4, 4, -5, 5]:
+                    tmp = df[
+                        df["date"]
+                        == int(du.observing_periods_str[i][0].replace("-", "")) + delta
+                    ][varx].values
+                    if len(tmp) > 0:
+                        list_vlines.append(tmp[0])
+                        break
+        return list(set(list_vlines))
+
+
 def plot_metrics_listdf(
-    list_df, label_list, plots_dir="./", varx="date_universal", suffix=""
+    list_df,
+    label_list,
+    plots_dir="./",
+    varx="date_universal",
+    suffix="",
+    plot_obs_seasons=False,
 ):
     """Plot metrics
 
@@ -121,30 +157,34 @@ def plot_metrics_listdf(
         plots_dir (str, optional): outdir. Defaults to './'.
         varx (str, optional): x variable. Defaults to 'date'.
         suffix (str, optional): suffix AL loop type. Defaults to ''.
+        plot_obs_seasons (boolean, optional): if plot observing seasons
     """
-    os.makedirs(plots_dir, exist_ok=True)
-    # Reformat date if needed
-    if varx == "date_universal":
 
+    os.makedirs(plots_dir, exist_ok=True)
+
+    if varx == "date_universal":
+        # Reformat date
         all_dates = np.concat([df["date"].values for df in list_df])
         all_dates.sort()
         to_merge = pd.DataFrame(
             {"date": all_dates, "date_universal": np.arange(1, len(all_dates) + 1)}
         )
-
         new_list_df = []
         for df in list_df:
             new_list_df.append(pd.merge(df, to_merge, on="date", how="left"))
-
     else:
         new_list_df = list_df
+
+    if plot_obs_seasons:
+        list_vlines = get_vertical_lines(new_list_df, varx)
 
     plt.figure(figsize=(16, 10), tight_layout=True)
 
     for i, df in enumerate(new_list_df):
-
         color_to_use = fink_colors_list[i]
         xlabel = "normalised date" if varx == "date_universal" else varx
+
+        zorder = 1000 if "Fink" in label_list[i] else 0
 
         plt.subplot(2, 2, 1)
         plt.scatter(
@@ -152,25 +192,52 @@ def plot_metrics_listdf(
             df["accuracy"],
             label=label_list[i],
             color=color_to_use,
+            zorder=zorder,
         )
+        if plot_obs_seasons:
+            for vl in list_vlines:
+                plt.axvline(x=vl, color="lightgrey", linestyle="--", zorder=-100)
         plt.legend()
         plt.xlabel(xlabel)
         plt.ylabel("accuracy")
 
         plt.subplot(2, 2, 2)
-        plt.scatter(df[varx].astype(int), df["efficiency"], color=color_to_use)
+        plt.scatter(
+            df[varx].astype(int),
+            df["efficiency"],
+            color=color_to_use,
+            zorder=zorder,
+        )
+        if plot_obs_seasons:
+            for vl in list_vlines:
+                plt.axvline(x=vl, color="lightgrey", linestyle="--", zorder=-100)
         plt.xlabel(xlabel)
         plt.ylabel("efficiency")
 
         plt.subplot(2, 2, 3)
-        plt.scatter(df[varx].astype(int), df["purity"], color=color_to_use)
+        plt.scatter(
+            df[varx].astype(int),
+            df["purity"],
+            color=color_to_use,
+            zorder=zorder,
+        )
+        if plot_obs_seasons:
+            for vl in list_vlines:
+                plt.axvline(x=vl, color="lightgrey", linestyle="--", zorder=-100)
         plt.xlabel(xlabel)
         plt.ylabel("purity")
 
         plt.subplot(2, 2, 4)
-        plt.scatter(df[varx].astype(int), df["fom"], color=color_to_use)
+        plt.scatter(
+            df[varx].astype(int),
+            df["fom"],
+            color=color_to_use,
+            zorder=zorder,
+        )
+        if plot_obs_seasons:
+            for vl in list_vlines:
+                plt.axvline(x=vl, color="lightgrey", linestyle="--", zorder=-100)
         plt.xlabel(xlabel)
         plt.ylabel("figure of merit")
-
     plt.savefig(f"{plots_dir}/metrics_superposed_{varx}{suffix}.png")
     plt.show()

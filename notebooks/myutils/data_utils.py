@@ -3,6 +3,20 @@ import numpy as np
 import pandas as pd
 from astropy.time import Time, TimeDelta
 
+observing_periods = {
+    1: [Time("2023-09-25", format="iso").jd, Time("2023-10-23", format="iso").jd],
+    2: [Time("2024-02-25", format="iso").jd, Time("2024-02-29", format="iso").jd],
+    3: [Time("2024-04-04", format="iso").jd, Time("2024-06-02", format="iso").jd],
+    4: [Time("2024-06-24", format="iso").jd, Time("2024-08-15", format="iso").jd],
+}
+
+observing_periods_str = {
+    1: ["2023-09-25", "2023-10-23"],
+    2: ["2024-02-25", "2024-02-29"],
+    3: ["2024-04-04", "2024-06-02"],
+    4: ["2024-06-24", "2024-08-15"],
+}
+
 
 def extract_ztf_names(row):
     """Function to extract names starting with 'ZTF'
@@ -76,13 +90,6 @@ def apply_timerange_fink_fup(df, ndaysplus=9):
     Returns:
         [pd.DatatFrame]: TNS dataframe with time range of AL SSO follow-up
     """
-
-    observing_periods = {
-        1: [Time("2023-09-25", format="iso").jd, Time("2023-10-23", format="iso").jd],
-        2: [Time("2024-02-25", format="iso").jd, Time("2024-02-29", format="iso").jd],
-        3: [Time("2024-04-04", format="iso").jd, Time("2024-06-02", format="iso").jd],
-        4: [Time("2024-06-24", format="iso").jd, Time("2024-08-15", format="iso").jd],
-    }
 
     df["fup requested"] = df["discoveryjd"].apply(lambda x: int(x + ndaysplus))
     df["fup requested (str)"] = df.loc[:, "fup requested"].apply(
