@@ -174,7 +174,7 @@ def get_alert_data(new_labels, date, verbose=False, withmaglimit=False):
         name = new_labels[date][i][0]
 
         r = requests.post(
-            "https://fink-portal.org/api/v1/objects",
+            "https://api.fink-portal.org/api/v1/objects",
             json={
                 "objectId": name,
                 "output-format": "json",
